@@ -1,0 +1,6 @@
+streamlit>=1.28.0
+requests>=2.31.0
+pillow>=10.0.0
+playwright>=1.40.0
+python-dotenv>=1.0.0
+typing-extensions>=4.8.0
