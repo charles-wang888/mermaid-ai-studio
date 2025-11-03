@@ -1,0 +1,20 @@
+{
+  "name": "mermaid-diagram-tool-validator",
+  "version": "1.0.0",
+  "description": "Mermaid syntax validator for Python project",
+  "main": "utils/mermaid_validator.js",
+  "scripts": {
+    "test": "node utils/mermaid_validator.js"
+  },
+  "dependencies": {
+    "mermaid": "^10.9.4"
+  },
+  "keywords": [
+    "mermaid",
+    "validator",
+    "syntax-check"
+  ],
+  "author": "",
+  "license": "MIT"
+}
+
