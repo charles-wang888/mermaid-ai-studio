@@ -8,6 +8,8 @@ from agents.fixers.gantt_fixer import GanttFixer
 from agents.fixers.sequence_fixer import SequenceDiagramFixer
 from agents.fixers.quadrant_chart_fixer import QuadrantChartFixer
 from agents.fixers.flowchart_fixer import FlowchartFixer
+from agents.fixers.pie_chart_fixer import PieChartFixer
+from agents.fixers.journey_fixer import JourneyFixer
 
 
 class SyntaxFixerFactory:
@@ -21,6 +23,8 @@ class SyntaxFixerFactory:
         "gantt": GanttFixer,
         "sequenceDiagram": SequenceDiagramFixer,
         "quadrantChart": QuadrantChartFixer,
+        "pie": PieChartFixer,
+        "journey": JourneyFixer,
     }
     
     _advanced_fixers: ClassVar[Dict[str, type]] = {

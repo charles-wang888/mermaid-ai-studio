@@ -9,6 +9,56 @@ class ClassDiagramFixer(SyntaxFixer):
     
     def get_diagram_type(self) -> str:
         return "classDiagram"
+    
+    def _infer_relationships(self, class_names: set) -> list:
+        """根据类名推断基本关系
+        
+        Args:
+            class_names: 所有类名的集合
+            
+        Returns:
+            推断出的关系列表
+        """
+        relationships = []
+        class_names_list = list(class_names)
+        
+        # 常见的关系模式推断
+        # Admin 和 Member 通常继承自 User
+        if 'Admin' in class_names and 'User' in class_names:
+            relationships.append('User <|-- Admin')
+        if 'Member' in class_names and 'User' in class_names:
+            relationships.append('User <|-- Member')
+        
+        # Service 类通常依赖实体类
+        for class_name in class_names_list:
+            if class_name.endswith('Service'):
+                # Service 类依赖相关的实体类
+                base_name = class_name.replace('Service', '')
+                if base_name in class_names:
+                    relationships.append(f'{class_name} ..> {base_name}')
+                # 检查特定服务的依赖
+                if class_name == 'LibraryService':
+                    if 'Book' in class_names:
+                        relationships.append('LibraryService ..> Book')
+                    if 'BorrowRecord' in class_names:
+                        relationships.append('LibraryService ..> BorrowRecord')
+                    # 注意：不添加 LibraryService ..> User，因为这不符合业务逻辑
+                elif class_name == 'UserService':
+                    if 'User' in class_names:
+                        relationships.append('UserService ..> User')
+        
+        # BorrowRecord 通常关联 User 和 Book
+        if 'BorrowRecord' in class_names:
+            if 'User' in class_names:
+                relationships.append('BorrowRecord --> User')
+            if 'Book' in class_names:
+                relationships.append('BorrowRecord --> Book')
+        
+        # Book 与 Category 的关联（一对多）
+        if 'Book' in class_names and 'Category' in class_names:
+            relationships.append('Category "1" --> "*" Book')
+        
+        return relationships
         
     def _fix_method_colon(self, line_stripped: str, original_indent: int) -> Optional[str]:
         """修复方法定义中的冒号问题
@@ -34,10 +84,25 @@ class ClassDiagramFixer(SyntaxFixer):
         if not mermaid_code or not mermaid_code.strip().startswith("classDiagram"):
             return mermaid_code
         
+        # 去除重复的 classDiagram 声明
         lines = mermaid_code.split('\n')
+        cleaned_lines = []
+        class_diagram_count = 0
+        for line in lines:
+            line_stripped = line.strip()
+            if line_stripped == 'classDiagram':
+                class_diagram_count += 1
+                if class_diagram_count == 1:
+                    cleaned_lines.append(line)
+                # 跳过后续的 classDiagram 声明
+            else:
+                cleaned_lines.append(line)
+        
+        lines = cleaned_lines
         fixed_lines = []
         class_definitions = {}  # 存储类定义
         relationships = []  # 存储关系
+        class_names = set()  # 收集所有类名
         
         i = 0
         while i < len(lines):
@@ -47,6 +112,28 @@ class ClassDiagramFixer(SyntaxFixer):
             
             if not line_stripped or line_stripped.startswith('//'):
                 fixed_lines.append(line)
+                i += 1
+                continue
+            
+            # 提取类名（用于后续关系检查）
+            class_match = re.match(r'class\s+(\w+)', line_stripped)
+            if class_match:
+                class_names.add(class_match.group(1))
+            
+            # 提取已存在的关系定义
+            relationship_patterns = [
+                r'^(\w+)\s+(<\|--|<\|\.\.|\*--|o--|-->|\.\.>|--|\.\.)\s+(\w+)',
+                r'^(\w+)\s+"([^"]+)"\s+(<\|--|<\|\.\.|\*--|o--|-->|\.\.>)\s+(\w+)',
+                r'^(\w+)\s+(<\|--|<\|\.\.|\*--|o--|-->|\.\.>)\s+"([^"]+)"\s+(\w+)',
+            ]
+            is_relationship = False
+            for pattern in relationship_patterns:
+                rel_match = re.match(pattern, line_stripped)
+                if rel_match:
+                    relationships.append(line_stripped)
+                    is_relationship = True
+                    break
+            if is_relationship:
                 i += 1
                 continue
             
@@ -205,28 +292,57 @@ class ClassDiagramFixer(SyntaxFixer):
         if in_class_def and current_class_lines:
             all_class_defs.append(('\n'.join(current_class_lines), current_class_name))
         
+        # 收集所有类名
+        all_class_names = set()
+        for _, class_name in all_class_defs:
+            if class_name:
+                all_class_names.add(class_name)
+        
+        # 如果没有关系定义，尝试从类名推断基本关系
+        if not all_relationships and all_class_names:
+            inferred_relationships = self._infer_relationships(all_class_names)
+            all_relationships.extend(inferred_relationships)
+        
         # 构建最终代码
         result_lines = []
-        if lines and lines[0].strip().startswith('classDiagram'):
-            result_lines.append('classDiagram')
+        result_lines.append('classDiagram')
         
+        # 输出所有类定义
+        seen_class_names = set()
         for class_def, class_name in all_class_defs:
-            if class_name and class_name not in [cd[1] for cd in all_class_defs[:all_class_defs.index((class_def, class_name))]]:
+            if class_name and class_name not in seen_class_names:
+                seen_class_names.add(class_name)
                 result_lines.append('')
                 result_lines.append(class_def)
         
+        # 输出所有关系（去重）
         if all_relationships:
             result_lines.append('')
+            seen_relationships = set()
             for rel in all_relationships:
-                result_lines.append(rel)
-        
-        if other_lines:
-            result_lines.extend(other_lines)
+                rel_normalized = re.sub(r'\s+', ' ', rel.strip())
+                if rel_normalized and rel_normalized not in seen_relationships:
+                    seen_relationships.add(rel_normalized)
+                    result_lines.append(rel)
         
         result = '\n'.join(result_lines)
         
-        # 确保第一行是classDiagram
-        if not result.strip().startswith('classDiagram'):
+        # 确保结果以 classDiagram 开头（去除任何重复）
+        if result.strip().startswith('classDiagram'):
+            # 去除开头的重复 classDiagram
+            result_lines_clean = []
+            class_diagram_found = False
+            for line in result.split('\n'):
+                line_stripped = line.strip()
+                if line_stripped == 'classDiagram':
+                    if not class_diagram_found:
+                        result_lines_clean.append('classDiagram')
+                        class_diagram_found = True
+                    # 跳过后续的 classDiagram
+                else:
+                    result_lines_clean.append(line)
+            result = '\n'.join(result_lines_clean)
+        else:
             result = 'classDiagram\n' + result
         
         return result

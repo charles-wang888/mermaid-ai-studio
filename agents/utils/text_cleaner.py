@@ -27,11 +27,11 @@ class TextCleaner:
         # 1. 清理HTML标签（包括<div>、</div>、<span>等）
         # 先提取div标签内的文本内容（如果有嵌套）
         while '<div' in text or '</div>' in text:
-            # 移除所有div标签
-            text = re.sub(r'<div[^>]*>', '', text, flags=re.IGNORECASE)
-            text = re.sub(r'</div>', '', text, flags=re.IGNORECASE)
-        # 清理所有其他HTML标签
-        text = re.sub(r'<[^>]+>', '', text)
+            # 移除所有div标签（包括自闭合标签）
+            text = re.sub(r'<div[^>]*/?>', '', text, flags=re.IGNORECASE)
+            text = re.sub(r'</div\s*>', '', text, flags=re.IGNORECASE)
+        # 清理所有其他HTML标签（包括自闭合标签）
+        text = re.sub(r'<[^>]+/?>', '', text)
         
         # 2. 清理HTML实体
         text = text.replace('&nbsp;', ' ')
@@ -43,10 +43,14 @@ class TextCleaner:
         text = text.replace('&#39;', "'")
         
         # 3. 清理Markdown格式化符号
-        # 清理 **文本** 格式（粗体）
+        # 首先清理 **文本** 格式（粗体）- 确保匹配所有情况
         text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+        # 清理单独的 ** 或 * 符号（没有包围文本的情况）
+        text = re.sub(r'\*\*+', '', text)  # 清理连续的 * 号（2个或更多）
         # 清理 *文本* 格式（斜体），但要小心不要误删数学表达式或代码中的*
         text = re.sub(r'(?<![*\w])\*([^*\n]+?)\*(?![*\w])', r'\1', text)
+        # 清理剩余的单个 * 符号（如果前后是空白或边界）
+        text = re.sub(r'(?<=\s)\*+(?=\s)', '', text)  # 清理被空白包围的 * 号
         # 清理 __文本__ 格式（粗体）
         text = re.sub(r'__([^_]+)__', r'\1', text)
         # 清理 _文本_ 格式（斜体）
@@ -54,6 +58,8 @@ class TextCleaner:
         # 清理行首或行尾的单独*符号
         text = re.sub(r'^\*+\s*', '', text, flags=re.MULTILINE)
         text = re.sub(r'\s*\*+$', '', text, flags=re.MULTILINE)
+        # 最后再次清理所有剩余的 ** 符号（可能出现在任何位置）
+        text = re.sub(r'\*\*+', '', text)
         
         # 4. 清理多余的空白字符
         text = re.sub(r'[ \t]+', ' ', text)  # 多个空格或制表符合并为一个空格

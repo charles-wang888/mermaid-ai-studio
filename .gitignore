@@ -1,3 +1,49 @@
 output/
 .idea/
 __pycache__/
+
+
+
+流程图没问题：
+时序图无法渲染：
+数据采集：LogStash从多个数据源（文件、数据库、消息队列等）采集日志数据。
+数据预处理：LogStash对采集的日志进行解析、过滤、转换和丰富（如提取字段、添加标签）。
+数据索引：处理后的数据被发送到ElasticSearch集群进行索引和存储。
+数据存储：ElasticSearch将数据以倒排索引方式存储，支持快速检索和分析。
+可视化查询：Kibana通过REST API连接到ElasticSearch，用户可在Kibana界面创建查询。
+数据检索：Kibana的查询请求发送到ElasticSearch，执行搜索和聚合。
+结果返回：ElasticSearch返回搜索结果给Kibana。
+可视化展示：Kibana将结果渲染为图表、表格和仪表盘，供用户查看和分析。
+互动的人类文本是：
+
+
+生成的mermaid代码是：
+sequenceDiagram
+participant LogSt as h as 数据采集组件
+participant El as ticSearch as 索引存储集群
+participant Kibana as 可视化工具
+participant 用户 as 用户
+
+    activate LogStash
+LogStash->>LogStash: 从文件、数据库、消息队列等数据源采集日志数据
+    deactivate LogStash
+
+    activate LogStash
+LogStash->>ElasticSearch: 发送处理后的日志数据进行索引和存储
+    deactivate LogStash
+
+ElasticSearch-->>Kibana: 存储的数据可供查询使用
+    activate Kibana
+Kibana->>ElasticSearch: 通过REST API发送查询请求
+    deactivate Kibana
+
+ElasticSearch-->>Kibana: 返回搜索结果给Kibana
+    activate Kibana
+Kibana->>用户: 将结果渲染为图表、表格和仪表盘供查看分析
+    deactivate Kibana
+
+    Note over LogStash,ElasticSearch: 数据采集与索引处理
+    Note over Kibana,用户: 查询与可视化展示
+
+
+测了前2个，吃过饭继续。
