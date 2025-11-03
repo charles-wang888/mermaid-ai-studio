@@ -43,8 +43,18 @@ class StateDiagramFixer(SyntaxFixer):
                 fixed_lines.append(line)
                 continue
             
+            # 0. 首先修复嵌套状态中的 * 应该改为 [*]（在所有其他匹配之前）
+            # 修复单独的 * 行
+            if line_stripped.strip() == '*':
+                fixed_lines.append(f"{' ' * original_indent}[*]")
+                continue
+            
+            # 修复 * --> 开头的转换（没有方括号的情况）
+            if re.match(r'^\*\s*-->\s*', line_stripped):
+                line_stripped = line_stripped.replace('* -->', '[*] -->', 1)
+            
             # 1. 修复使用花括号的转换条件
-            brace_pattern = r'(\[[*]\]|"[^"]+"|[A-Za-z_][A-Za-z0-9_\s]*)\s*-->\s*(\[[*]\]|"[^"]+"|[A-Za-z_][A-Za-z0-9_\s]*)\s*\{\s*([^}]+)\s*\}'
+            brace_pattern = r'(\[[*]\]|"[^"]+"|[A-Za-z_][A-Za-z0-9_\s]*)\s*-->\s*(\[[*]\]|"[^"]+"|[A-Za-z_][A-Za-z0-9_\s]*)\s*\{\s*([^}]+)\s*\}' 
             brace_match = re.search(brace_pattern, line_stripped)
             if brace_match:
                 source_state = brace_match.group(1).strip().strip('"\'')
@@ -98,12 +108,16 @@ class StateDiagramFixer(SyntaxFixer):
                     fixed_lines.append(fixed_line)
                 continue
             
-            # 4. 处理状态定义行
-            state_def_pattern = r'state\s+([A-Za-z_][A-Za-z0-9_\s]*)\s*\{'
+            # 4. 处理状态定义行：修复状态名中的空格和中文
+            state_def_pattern = r'state\s+(.+?)\s*\{'
             state_def_match = re.match(state_def_pattern, line_stripped)
             if state_def_match:
-                fixed_lines.append(line)
+                state_name = state_def_match.group(1).strip().strip('"\'')
+                quoted_state_name = quote_if_needed(state_name)
+                fixed_line = f"{' ' * original_indent}state {quoted_state_name} {{"
+                fixed_lines.append(fixed_line)
                 continue
+            
             
             fixed_lines.append(line)
         

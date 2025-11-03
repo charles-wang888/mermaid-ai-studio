@@ -62,6 +62,43 @@ class QuadrantChartFixer(SyntaxFixer):
                     fixed_lines.append(f"{quadrant_prefix} {quadrant_quoted}")
                     continue
             
+            # 修复数据点的坐标格式和计算
+            # 匹配格式：名称: [x, y] 或 名称 : [x, y]
+            point_pattern = r'^([^:]+?)\s*:\s*\[([^\]]+)\]'
+            point_match = re.match(point_pattern, line_stripped)
+            if point_match:
+                point_name = point_match.group(1).strip()
+                coords_str = point_match.group(2).strip()
+                
+                try:
+                    # 解析坐标
+                    coords = [float(x.strip()) for x in coords_str.split(',')]
+                    if len(coords) == 2:
+                        x, y = coords
+                        
+                        # 检查坐标是否已经归一化（在0-1范围内）
+                        # 如果 x > 1 或 y > 1，可能是原始值，需要转换
+                        
+                        # X轴：市场增长率 0%-50% -> 0-1
+                        # 如果 x > 1，可能是百分比值（0-50），需要除以50
+                        if x > 1:
+                            x = x / 50.0
+                        
+                        # Y轴：相对市场份额 0-2.0 -> 0-1
+                        # 如果 y > 1，可能是原始值（0-2.0），需要除以2.0
+                        if y > 1:
+                            y = y / 2.0
+                        
+                        # 确保坐标在 0-1 范围内
+                        x = max(0.0, min(1.0, x))
+                        y = max(0.0, min(1.0, y))
+                        
+                        fixed_lines.append(f"{point_name}: [{x:.2f}, {y:.2f}]")
+                        continue
+                except (ValueError, IndexError):
+                    # 如果解析失败，保持原样
+                    pass
+            
             fixed_lines.append(line)
         
         return '\n'.join(fixed_lines)
