@@ -59,27 +59,70 @@ class MultiLLMClient:
                 raise ValueError(f"未实现的后端: {self.backend}")
         
         except requests.exceptions.RequestException as e:
-            print(f"LLM调用失败 ({self.backend}): {e}")
-            return self._mock_response(messages[-1].get("content", ""))
+            error_msg = f"LLM调用失败 ({self.backend}): {e}"
+            print(error_msg)
+            logging.error(error_msg, exc_info=True)
+            # 不再返回mock响应，直接抛出异常让上层处理
+            raise RuntimeError(f"模型调用失败: {str(e)}")
     
     def _chat_ollama(self, messages: list, stream: bool = False, **kwargs) -> str:
         """Ollama聊天"""
         url = f"{self.base_url}/chat/completions"
+        
+        # 使用options参数来控制模型行为
+        options = kwargs.get("options", {})
+        
         payload = {
             "model": self.model_name,
             "messages": messages,
             "stream": stream,
-            **kwargs
+            "options": options,
+            **{k: v for k, v in kwargs.items() if k != "options"}
         }
         
-        response = requests.post(url, json=payload, timeout=self.timeout)
-        response.raise_for_status()
-        result = response.json()
-        
-        if stream:
-            return result.get("choices", [{}])[0].get("message", {}).get("content", "")
-        else:
-            return result.get("choices", [{}])[0].get("message", {}).get("content", "")
+        try:
+            response = requests.post(url, json=payload, timeout=self.timeout)
+            response.raise_for_status()
+            result = response.json()
+            
+            # 检查响应格式
+            if "choices" not in result:
+                logging.warning(f"Ollama响应格式异常: {result}")
+                raise ValueError(f"Ollama响应格式错误: 缺少choices字段")
+            
+            if not result.get("choices"):
+                logging.warning(f"Ollama响应为空: {result}")
+                raise ValueError(f"Ollama响应为空: choices列表为空")
+            
+            if stream:
+                content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+            else:
+                content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+            
+            if not content:
+                logging.warning(f"Ollama返回内容为空: {result}")
+                raise ValueError(f"模型返回内容为空")
+            
+            return content
+            
+        except requests.exceptions.Timeout:
+            error_msg = f"Ollama请求超时 (timeout={self.timeout}s)，模型: {self.model_name}"
+            logging.error(error_msg)
+            raise RuntimeError(error_msg)
+        except requests.exceptions.ConnectionError as e:
+            error_msg = f"无法连接到Ollama服务 ({self.base_url})，请确保Ollama服务正在运行。错误: {str(e)}"
+            logging.error(error_msg)
+            raise RuntimeError(error_msg)
+        except requests.exceptions.HTTPError as e:
+            error_msg = f"Ollama HTTP错误，模型: {self.model_name}。错误: {str(e)}"
+            if hasattr(e.response, 'text'):
+                error_msg += f"，响应: {e.response.text[:200]}"
+            logging.error(error_msg)
+            raise RuntimeError(error_msg)
+        except (ValueError, KeyError) as e:
+            error_msg = f"Ollama响应解析错误: {str(e)}"
+            logging.error(error_msg)
+            raise RuntimeError(error_msg)
     
     def _chat_openai_compatible(self, messages: list, stream: bool = False, **kwargs) -> Union[str, Iterator[str]]:
         """OpenAI兼容的聊天接口（vLLM, SiliconFlow, OpenAI）"""
@@ -207,21 +250,6 @@ class MultiLLMClient:
             })
         return claude_messages
     
-    def _mock_response(self, user_message: str) -> str:
-        """模拟响应（用于演示）"""
-        if "澄清" in user_message:
-            return """---
-状态：需要澄清
-问题1：您希望绘制的系统是什么类型的？（例如：微服务、单体应用、数据管道等）
-问题2：系统的主要用户是谁？预期的用户规模有多大？
-"""
-        else:
-            return """组件1：名称=用户服务，类型=input，属性=用户认证、用户管理，形状=rectangle
-组件2：名称=业务处理，类型=process，属性=逻辑处理、状态管理，形状=rounded_rect
-组件3：名称=数据存储，类型=storage，属性=持久化、备份，形状=circle
-关系1：源=用户服务，目标=业务处理，类型=data，内容=用户请求
-关系2：源=业务处理，目标=数据存储，类型=data，内容=数据保存
-"""
 
 
 # 为了兼容性，保留旧类名

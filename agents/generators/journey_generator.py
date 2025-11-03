@@ -24,11 +24,5 @@ class JourneyGenerator(DiagramGenerator):
         if hasattr(self.agent, '_validate_and_fix_mermaid_code'):
             mermaid_code = self.agent._validate_and_fix_mermaid_code(mermaid_code, self.get_diagram_type())
         
-        # 使用修复器修复语法错误
-        from agents.fixers.fixer_factory import SyntaxFixerFactory
-        fixer = SyntaxFixerFactory.create(self.get_diagram_type())
-        if fixer:
-            mermaid_code = fixer.fix(mermaid_code)
-        
         return mermaid_code
 

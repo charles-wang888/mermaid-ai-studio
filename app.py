@@ -973,6 +973,26 @@ def main():
                                                 # 执行语法检查（使用最新的代码）
                                                 is_valid, error_info = st.session_state.generation_agent.mermaid_renderer.validate_syntax_with_details(current_code)
                                                 
+                                                # 调试信息：检查 mermaid.js 验证是否执行
+                                                with st.expander("🔍 调试：mermaid.js 验证状态", expanded=False):
+                                                    import logging
+                                                    # 获取日志输出
+                                                    log_capture = []
+                                                    class LogCapture(logging.Handler):
+                                                        def emit(self, record):
+                                                            log_capture.append(self.format(record))
+                                                    handler = LogCapture()
+                                                    handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
+                                                    logger = logging.getLogger('utils.mermaid_js_validator')
+                                                    logger.addHandler(handler)
+                                                    logger.setLevel(logging.ERROR)
+                                                    # 检查是否有相关错误日志
+                                                    if log_capture:
+                                                        st.text("最近的错误日志:")
+                                                        st.code('\n'.join(log_capture[-5:]), language='text')
+                                                    else:
+                                                        st.text("未发现错误日志（验证可能成功执行或未执行）")
+                                                
                                                 # 调试信息：显示检查结果（临时启用以排查问题）
                                                 with st.expander("🔍 调试：检查结果详情", expanded=False):
                                                     st.write(f"**检查结果：** {'✅ 语法有效' if is_valid else '❌ 语法无效'}")

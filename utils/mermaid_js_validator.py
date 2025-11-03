@@ -1,8 +1,11 @@
 """Mermaid.js验证器"""
 import os
+import logging
 from typing import Optional, Dict
 from utils.browser_manager import BrowserManager
 from utils.error_factory import ErrorInfoFactory
+
+logger = logging.getLogger(__name__)
 
 
 class MermaidJSValidator:
@@ -41,43 +44,49 @@ class MermaidJSValidator:
         if not os.path.exists(self.mermaid_js_path):
             return None  # mermaid.js不存在，跳过验证
         
+        browser = None
+        page = None
         try:
             browser = self.browser_manager.get_browser()
-            page = None
-            try:
-                page = browser.new_page()
+            page = browser.new_page()
+            
+            # 执行验证
+            result = self._execute_validation(page, mermaid_code)
+            
+            if result and not result.get('isValid', True):
+                # 有错误
+                error_msg = result.get('error', '未知错误')
+                error_lines = self._extract_error_lines(mermaid_code, error_msg)
+                code_snippet = self._extract_error_snippet(mermaid_code, error_lines)
                 
-                # 执行验证
-                result = self._execute_validation(page, mermaid_code)
-                
-                if result and not result.get('isValid', True):
-                    # 有错误
-                    error_msg = result.get('error', '未知错误')
-                    error_lines = self._extract_error_lines(mermaid_code, error_msg)
-                    code_snippet = self._extract_error_snippet(mermaid_code, error_lines)
-                    
-                    return ErrorInfoFactory.create_error_info(
-                        message=f"语法错误: {error_msg}",
-                        line_number=error_lines[0] if error_lines else None,
-                        error_lines=error_lines,
-                        code_snippet=code_snippet,
-                        diagram_type=result.get('diagramType'),
-                        source='mermaid.js 验证'
-                    )
-                elif result and result.get('isValid', True):
-                    # 验证成功，返回图表类型信息（用于后续使用）
-                    return {
-                        'isValid': True,
-                        'diagramType': result.get('diagramType')
-                    }
-            finally:
-                if page is not None:
-                    page.close()
-                if browser is not None:
-                    browser.close()
+                return ErrorInfoFactory.create_error_info(
+                    message=f"语法错误: {error_msg}",
+                    line_number=error_lines[0] if error_lines else None,
+                    error_lines=error_lines,
+                    code_snippet=code_snippet,
+                    diagram_type=result.get('diagramType'),
+                    source='mermaid.js 验证'
+                )
+            elif result and result.get('isValid', True):
+                # 验证成功，返回图表类型信息（用于后续使用）
+                return {
+                    'isValid': True,
+                    'diagramType': result.get('diagramType')
+                }
         except Exception:
             # 验证过程出现异常，返回None表示验证失败但不影响其他验证
             return None
+        finally:
+            if page is not None:
+                try:
+                    page.close()
+                except:
+                    pass
+            if browser is not None:
+                try:
+                    browser.close()
+                except:
+                    pass
         
         return None
     
