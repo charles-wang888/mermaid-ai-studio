@@ -20,12 +20,6 @@ class QuadrantChartGenerator(DiagramGenerator):
         # 提取并清理代码
         mermaid_code = self.extract_and_validate(response)
         
-        # 使用修复器修复语法错误
-        from agents.fixers.fixer_factory import SyntaxFixerFactory
-        fixer = SyntaxFixerFactory.create(self.get_diagram_type())
-        if fixer:
-            mermaid_code = fixer.fix(mermaid_code)
-        
         # 验证代码格式
         if hasattr(self.agent, '_validate_and_fix_mermaid_code'):
             mermaid_code = self.agent._validate_and_fix_mermaid_code(mermaid_code, self.get_diagram_type())

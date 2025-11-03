@@ -84,7 +84,7 @@ class ClassDiagramFixer(SyntaxFixer):
         if not mermaid_code or not mermaid_code.strip().startswith("classDiagram"):
             return mermaid_code
         
-        # 去除重复的 classDiagram 声明
+        # 去除重复的 classDiagram 声明和前导空格
         lines = mermaid_code.split('\n')
         cleaned_lines = []
         class_diagram_count = 0
@@ -93,7 +93,8 @@ class ClassDiagramFixer(SyntaxFixer):
             if line_stripped == 'classDiagram':
                 class_diagram_count += 1
                 if class_diagram_count == 1:
-                    cleaned_lines.append(line)
+                    # 确保没有前导空格
+                    cleaned_lines.append('classDiagram')
                 # 跳过后续的 classDiagram 声明
             else:
                 cleaned_lines.append(line)
@@ -313,7 +314,13 @@ class ClassDiagramFixer(SyntaxFixer):
             if class_name and class_name not in seen_class_names:
                 seen_class_names.add(class_name)
                 result_lines.append('')
-                result_lines.append(class_def)
+                # 清理类定义中的多余空行
+                class_def_lines = class_def.split('\n')
+                cleaned_class_def_lines = []
+                for cls_line in class_def_lines:
+                    if cls_line.strip() or (cleaned_class_def_lines and cleaned_class_def_lines[-1].strip()):
+                        cleaned_class_def_lines.append(cls_line)
+                result_lines.extend(cleaned_class_def_lines)
         
         # 输出所有关系（去重）
         if all_relationships:
@@ -327,23 +334,32 @@ class ClassDiagramFixer(SyntaxFixer):
         
         result = '\n'.join(result_lines)
         
-        # 确保结果以 classDiagram 开头（去除任何重复）
-        if result.strip().startswith('classDiagram'):
-            # 去除开头的重复 classDiagram
-            result_lines_clean = []
-            class_diagram_found = False
-            for line in result.split('\n'):
-                line_stripped = line.strip()
-                if line_stripped == 'classDiagram':
-                    if not class_diagram_found:
-                        result_lines_clean.append('classDiagram')
-                        class_diagram_found = True
-                    # 跳过后续的 classDiagram
-                else:
-                    result_lines_clean.append(line)
-            result = '\n'.join(result_lines_clean)
-        else:
+        # 确保结果以 classDiagram 开头（去除任何重复和多余空格）
+        result = result.strip()
+        if not result.startswith('classDiagram'):
             result = 'classDiagram\n' + result
+        
+        # 去除开头的重复 classDiagram 和多余空行
+        result_lines_clean = []
+        class_diagram_found = False
+        for line in result.split('\n'):
+            line_stripped = line.strip()
+            if line_stripped == 'classDiagram':
+                if not class_diagram_found:
+                    result_lines_clean.append('classDiagram')
+                    class_diagram_found = True
+                # 跳过后续的 classDiagram
+            elif line_stripped or (result_lines_clean and result_lines_clean[-1].strip()):
+                # 保留非空行，或者在已有内容后的空行
+                result_lines_clean.append(line)
+        
+        result = '\n'.join(result_lines_clean).strip()
+        
+        # 确保结果以 classDiagram 开头（没有前导空格）
+        if result.startswith(' '):
+            result = result.lstrip()
+        if not result.startswith('classDiagram'):
+            result = 'classDiagram' + ('\n' + result if result else '')
         
         return result
 

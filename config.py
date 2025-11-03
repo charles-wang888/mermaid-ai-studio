@@ -10,7 +10,7 @@ load_dotenv()
 LLM_CONFIG = {
     # Ollama本地模型（默认）
     "ollama": {
-        "model_name": "qwen2.5:7b",  # 可以改为qwen3:4b等其他模型
+        "model_name": "qwen2.5:32b",  # 可以改为qwen2.5:7b等其他模型
         "base_url": "http://localhost:11434/v1",
         "api_key": "NA",
         "timeout": 60,

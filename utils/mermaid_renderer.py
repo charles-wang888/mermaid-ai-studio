@@ -171,8 +171,16 @@ class MermaidRenderer:
             )
             all_errors.append(error_info)
         
-        if mermaid_js_result and isinstance(mermaid_js_result, dict) and not mermaid_js_result.get('isValid', True):
-            all_errors.append(mermaid_js_result)
+        # 处理 mermaid.js 验证结果
+        if mermaid_js_result:
+            if isinstance(mermaid_js_result, dict):
+                # 如果返回的是错误信息（有 source 字段且不是 'mermaid.js 验证'，或者是验证异常）
+                if mermaid_js_result.get('source') == 'mermaid.js 验证异常':
+                    # mermaid.js 验证过程出现异常，添加警告但不阻塞
+                    all_errors.append(mermaid_js_result)
+                elif not mermaid_js_result.get('isValid', True):
+                    # 正常的语法错误
+                    all_errors.append(mermaid_js_result)
         
         # 合并所有错误或返回成功
         if all_errors:

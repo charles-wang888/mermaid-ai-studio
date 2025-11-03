@@ -52,6 +52,20 @@ class KeywordSpellingChecker(SyntaxChecker):
                 if re.match(r'^\s*sequenc[^e]diagram', stripped_lower):
                     return line_num
         
+        # 检查 classDiagram 拼写错误
+        # 检查第一行是否为 classDiagrams（多了一个s）
+        if line_num == 1:
+            if re.match(r'^\s*classdiagrams\s*$', stripped_lower) or \
+               re.match(r'^\s*classdiagrams\s+', stripped_lower):
+                return line_num
+            # 检查 classDiagram 后面跟了不应该的字符
+            if stripped_lower.startswith('classdiagram'):
+                if len(stripped) > 12:
+                    char_after = stripped[12]
+                    # classDiagram 后面只能是空格、冒号、换行等
+                    if char_after not in [' ', '\n', '\t', ':', '-']:
+                        return line_num
+        
         return None
     
     def get_error_message(self, line_num: int, line_content: str) -> str:
@@ -82,6 +96,16 @@ class KeywordSpellingChecker(SyntaxChecker):
         if ('equence' in stripped_lower or 'equenc' in stripped_lower) and not stripped_lower.startswith('sequencediagram'):
             wrong_word = stripped.split()[0] if stripped.split() else ''
             return f"第{line_num}行：拼写错误，应该是 'sequenceDiagram' 而不是 '{wrong_word}' (完整行: {line_content[:50]})"
+        
+        # classDiagram 拼写错误消息
+        if stripped_lower.startswith('classdiagrams'):
+            wrong_word = stripped.split()[0] if stripped.split() else ''
+            return f"第{line_num}行：拼写错误，应该是 'classDiagram' 而不是 '{wrong_word}' (完整行: {line_content[:50]})"
+        if stripped_lower.startswith('classdiagram') and len(line_content.strip()) > 12:
+            char_after = line_content.strip()[12]
+            if char_after not in [' ', '\n', '\t', ':', '-']:
+                wrong_part = line_content.strip()[12:].split()[0] if len(line_content.strip()) > 12 else ''
+                return f"第{line_num}行：classDiagram语法错误，'classDiagram' 后面应该是空格或换行，而不是 '{wrong_part}' (完整行: {line_content[:50]})"
         
         return super().get_error_message(line_num, line_content)
 
