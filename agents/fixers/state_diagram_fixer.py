@@ -39,11 +39,41 @@ class StateDiagramFixer(SyntaxFixer):
             
             if not line_stripped or line_stripped.startswith('//'):
                 fixed_lines.append(line)
+                i += 1
                 continue
             
             if line_stripped.startswith('stateDiagram-v2'):
                 fixed_lines.append(line)
+                i += 1
                 continue
+            
+            # 修复连在一起的引号问题（如 "待支付""待支付" --> "已支付"）
+            # 根据错误信息：[*] --> "待支付""待支付" --> "已支付"
+            # 这可能是状态名称被重复，或者是两行被错误合并
+            if '""' in line_stripped:
+                # 模式1: [*] --> "待支付""待支付" --> "已支付" (状态名称重复)
+                # 修复为: [*] --> "待支付" 和 "待支付" --> "已支付" (分成两行)
+                pattern1 = r'(\[[*]\]|"[^"]+"|[A-Za-z_][A-Za-z0-9_\s]*)\s*-->\s*"([^"]+)""\2"\s*-->\s*(\[[*]\]|"[^"]+"|[A-Za-z_][A-Za-z0-9_\s]*)'
+                match1 = re.search(pattern1, line_stripped)
+                if match1:
+                    source = match1.group(1).strip()
+                    repeated_state = match1.group(2)
+                    target = match1.group(3).strip()
+                    source_quoted = quote_if_needed(source)
+                    state_quoted = quote_if_needed(repeated_state)
+                    target_quoted = quote_if_needed(target)
+                    # 分成两行
+                    fixed_lines.append(f"{' ' * original_indent}{source_quoted} --> {state_quoted}")
+                    fixed_lines.append(f"{' ' * original_indent}{state_quoted} --> {target_quoted}")
+                    i += 1
+                    continue
+                
+                # 模式2: "待支付""待支付" (重复的状态名称，没有箭头)
+                line_stripped = re.sub(r'"([^"]+)""\1"(?!\s*-->)', r'"\1"', line_stripped)
+                # 模式3: "状态A""状态B" --> "状态C" (不同的状态连在一起，中间缺少箭头)
+                line_stripped = re.sub(r'"([^"]+)""([^"]+)"\s*-->\s*', r'"\1" --> "\2"\n    "\2" --> ', line_stripped)
+                # 模式4: "状态A""状态A" --> (重复状态且后面有箭头)
+                line_stripped = re.sub(r'"([^"]+)""\1"\s*-->\s*', r'"\1" --> ', line_stripped)
             
             # 0. 首先修复嵌套状态中的 * 应该改为 [*]（在所有其他匹配之前）
             # 修复单独的 * 行

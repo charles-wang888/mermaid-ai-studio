@@ -1287,6 +1287,31 @@ class GenerationAgent(DiagramAgentBase):
                 fixed_lines.append(line)
                 continue
             
+            # 修复连在一起的引号问题（如 "待支付""待支付" --> "已支付"）
+            # 根据错误信息：[*] --> "待支付""待支付" --> "已支付"
+            if '""' in line_stripped:
+                # 模式1: [*] --> "待支付""待支付" --> "已支付" (状态名称重复)
+                pattern1 = r'(\[[*]\]|"[^"]+"|[A-Za-z_][A-Za-z0-9_\s]*)\s*-->\s*"([^"]+)""\2"\s*-->\s*(\[[*]\]|"[^"]+"|[A-Za-z_][A-Za-z0-9_\s]*)'
+                match1 = re.search(pattern1, line_stripped)
+                if match1:
+                    source = match1.group(1).strip()
+                    repeated_state = match1.group(2)
+                    target = match1.group(3).strip()
+                    source_quoted = quote_if_needed(source)
+                    state_quoted = quote_if_needed(repeated_state)
+                    target_quoted = quote_if_needed(target)
+                    # 分成两行
+                    fixed_lines.append(f"{' ' * original_indent}{source_quoted} --> {state_quoted}")
+                    fixed_lines.append(f"{' ' * original_indent}{state_quoted} --> {target_quoted}")
+                    continue
+                
+                # 模式2: "待支付""待支付" (重复的状态名称，没有箭头)
+                line_stripped = re.sub(r'"([^"]+)""\1"(?!\s*-->)', r'"\1"', line_stripped)
+                # 模式3: "状态A""状态B" --> "状态C" (不同的状态连在一起，中间缺少箭头)
+                line_stripped = re.sub(r'"([^"]+)""([^"]+)"\s*-->\s*', r'"\1" --> "\2"\n    "\2" --> ', line_stripped)
+                # 模式4: "状态A""状态A" --> (重复状态且后面有箭头)
+                line_stripped = re.sub(r'"([^"]+)""\1"\s*-->\s*', r'"\1" --> ', line_stripped)
+            
             # 修复状态转换行的格式
             # 匹配模式：State1 --> State2 { 条件 } 或 State1 --> State2: 条件
             # 匹配模式：[*] --> State { 条件 } 或 [*] --> State: 条件
